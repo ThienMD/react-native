@@ -1248,8 +1248,10 @@ const TextInput = createReactClass({
     }
 
     const text = event.nativeEvent.text;
+    const start = event.nativeEvent.start;
+    const end = event.nativeEvent.end;
     this.props.onChange && this.props.onChange(event);
-    this.props.onChangeText && this.props.onChangeText(text);
+    this.props.onChangeText && this.props.onChangeText(text, start, end);
 
     if (!this._inputRef) {
       // calling `this.props.onChange` or `this.props.onChangeText`

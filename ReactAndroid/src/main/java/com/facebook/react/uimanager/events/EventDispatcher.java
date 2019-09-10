@@ -16,6 +16,10 @@ import com.facebook.react.common.MapBuilder;
 import com.facebook.react.modules.core.ChoreographerCompat;
 import com.facebook.react.modules.core.ReactChoreographer;
 import com.facebook.react.uimanager.common.UIManagerType;
+import com.facebook.react.views.textinput.ReactTextChangedEvent;
+import com.facebook.react.views.textinput.ReactTextInputEvent;
+import com.facebook.react.views.textinput.ReactTextInputKeyPressEvent;
+import com.facebook.react.views.textinput.ReactTextInputSelectionEvent;
 import com.facebook.systrace.Systrace;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -344,45 +348,104 @@ public class EventDispatcher implements LifecycleEventListener {
   private class DispatchEventsRunnable implements Runnable {
 
     @Override
-    public void run() {
-      Systrace.beginSection(Systrace.TRACE_TAG_REACT_JAVA_BRIDGE, "DispatchEventsRunnable");
-      try {
-        Systrace.endAsyncFlow(
-            Systrace.TRACE_TAG_REACT_JAVA_BRIDGE,
-            "ScheduleDispatchFrameCallback",
-            mHasDispatchScheduledCount.getAndIncrement());
-        mHasDispatchScheduled = false;
-        Assertions.assertNotNull(mReactEventEmitter);
-        synchronized (mEventsToDispatchLock) {
-          if (mEventsToDispatchSize > 0) {
-            // We avoid allocating an array and iterator, and "sorting" if we don't need to.
-            // This occurs when the size of mEventsToDispatch is zero or one.
-            if (mEventsToDispatchSize > 1) {
-              Arrays.sort(mEventsToDispatch, 0, mEventsToDispatchSize, EVENT_COMPARATOR);
-            }
-            for (int eventIdx = 0; eventIdx < mEventsToDispatchSize; eventIdx++) {
-              Event event = mEventsToDispatch[eventIdx];
-              // Event can be null if it has been coalesced into another event.
-              if (event == null) {
-                continue;
-              }
-              Systrace.endAsyncFlow(
-                  Systrace.TRACE_TAG_REACT_JAVA_BRIDGE, event.getEventName(), event.getUniqueID());
-              event.dispatch(mReactEventEmitter);
-              event.dispose();
-            }
-            clearEventsToDispatch();
-            mEventCookieToLastEventIdx.clear();
-          }
-        }
-        for (BatchEventDispatchedListener listener : mPostEventDispatchListeners) {
-          listener.onBatchEventDispatched();
-        }
-      } finally {
-        Systrace.endSection(Systrace.TRACE_TAG_REACT_JAVA_BRIDGE);
-      }
-    }
-  }
+           public void run() {
+             Systrace.beginSection(Systrace.TRACE_TAG_REACT_JAVA_BRIDGE, "DispatchEventsRunnable");
+             try {
+               Systrace.endAsyncFlow(
+                   Systrace.TRACE_TAG_REACT_JAVA_BRIDGE,
+                   "ScheduleDispatchFrameCallback",
+                   mHasDispatchScheduledCount.getAndIncrement());
+               mHasDispatchScheduled = false;
+               Assertions.assertNotNull(mReactEventEmitter);
+               synchronized (mEventsToDispatchLock) {
+                 if (mEventsToDispatchSize > 0) {
+                   // We avoid allocating an array and iterator, and "sorting" if we don't need to.
+                   // This occurs when the size of mEventsToDispatch is zero or one.
+                   if (mEventsToDispatchSize > 1) {
+                     Arrays.sort(mEventsToDispatch, 0, mEventsToDispatchSize, EVENT_COMPARATOR);
+                   }
+                   int startSelection = 0, endSelection = 0; // edit code to return start and end in onChangeText props
+                   if (mEventsToDispatchSize == 4 &&
+                           ((mEventsToDispatch[0] instanceof ReactTextChangedEvent && mEventsToDispatch[3] instanceof ReactTextInputKeyPressEvent) ||
+                           (mEventsToDispatch[0] instanceof ReactTextInputKeyPressEvent && mEventsToDispatch[1] instanceof ReactTextChangedEvent) )){
+                     for (int eventIdx = mEventsToDispatchSize -1; eventIdx >= 0 ; eventIdx--) {
+                       Event event = mEventsToDispatch[eventIdx];
+                       // Event can be null if it has been coalesced into another event.
+                       if (event == null) {
+                         continue;
+                       }
+                       if (event instanceof ReactTextInputSelectionEvent){
+                         ReactTextInputSelectionEvent selectionEvent =  (ReactTextInputSelectionEvent)event;
+                         startSelection = selectionEvent.getSelectionStart();
+                         endSelection = selectionEvent.getSelectionEnd();
+                         if (String.valueOf(startSelection) == null  ){
+                           try {
+                             Thread.sleep(20);
+                             startSelection = selectionEvent.getSelectionStart();
+                             endSelection = selectionEvent.getSelectionEnd();
+                           } catch (InterruptedException e) {
+                             e.printStackTrace();
+                           }
+                         }
+                       }
+                       if (event instanceof ReactTextChangedEvent){
+                         Systrace.endAsyncFlow(
+                                 Systrace.TRACE_TAG_REACT_JAVA_BRIDGE, event.getEventName(), event.getUniqueID());
+                         ReactTextChangedEvent changedEvent =  (ReactTextChangedEvent)event;
+                         changedEvent.dispatchCustomForMention(mReactEventEmitter, startSelection,endSelection);
+                         event.dispose();
+                       }else{
+                         Systrace.endAsyncFlow(
+                                 Systrace.TRACE_TAG_REACT_JAVA_BRIDGE, event.getEventName(), event.getUniqueID());
+                         event.dispatch(mReactEventEmitter);
+                         event.dispose();
+                       }
+
+                     }
+                   }else{
+                     for (int eventIdx = 0; eventIdx < mEventsToDispatchSize; eventIdx++) {
+                       Event event = mEventsToDispatch[eventIdx];
+
+                       // Event can be null if it has been coalesced into another event.
+                       if (event == null) {
+                         continue;
+                       }
+                       if (event instanceof ReactTextChangedEvent){
+                         for (int i = eventIdx ; i < mEventsToDispatchSize; i++ ){
+                           Event subEvent = mEventsToDispatch[i];
+                           if (subEvent instanceof ReactTextInputSelectionEvent){
+                             ReactTextInputSelectionEvent selectionEvent =  (ReactTextInputSelectionEvent)subEvent;
+                             startSelection = selectionEvent.getSelectionStart();
+                             endSelection = selectionEvent.getSelectionEnd();
+                             if (String.valueOf(startSelection) == null  ){
+       //                       System.out.println("Lỗi get selection 2");
+                             }
+                             break;
+                           }
+                         }
+                         Systrace.endAsyncFlow(
+                                 Systrace.TRACE_TAG_REACT_JAVA_BRIDGE, event.getEventName(), event.getUniqueID());
+                         ReactTextChangedEvent changedEvent =  (ReactTextChangedEvent)event;
+                         changedEvent.dispatchCustomForMention(mReactEventEmitter, startSelection,endSelection);
+                         event.dispose();
+                       }else{
+                         Systrace.endAsyncFlow(
+                                 Systrace.TRACE_TAG_REACT_JAVA_BRIDGE, event.getEventName(), event.getUniqueID());
+                         event.dispatch(mReactEventEmitter);
+                         event.dispose();
+                       }
+                     }
+                   }
+
+                   clearEventsToDispatch();
+                   mEventCookieToLastEventIdx.clear();
+                 }
+               }
+             } finally {
+               Systrace.endSection(Systrace.TRACE_TAG_REACT_JAVA_BRIDGE);
+             }
+           }
+         }
 
   private void addEventToEventsToDispatch(Event event) {
     if (mEventsToDispatchSize == mEventsToDispatch.length) {

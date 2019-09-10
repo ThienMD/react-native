@@ -15,7 +15,7 @@ import com.facebook.react.uimanager.events.RCTEventEmitter;
 /**
  * Event emitted by EditText native view when the text selection changes.
  */
-/* package */ class ReactTextInputSelectionEvent
+/* package */ public class ReactTextInputSelectionEvent
     extends Event<ReactTextInputSelectionEvent> {
 
   private static final String EVENT_NAME = "topSelectionChange";
@@ -31,6 +31,14 @@ import com.facebook.react.uimanager.events.RCTEventEmitter;
     mSelectionStart = selectionStart;
     mSelectionEnd = selectionEnd;
   }
+
+  public int getSelectionStart(){
+       return mSelectionStart  ;
+     }
+
+     public int getSelectionEnd(){
+       return mSelectionEnd  ;
+     }
 
   @Override
   public String getEventName() {

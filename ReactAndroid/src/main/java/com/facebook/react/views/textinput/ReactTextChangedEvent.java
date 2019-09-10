@@ -37,6 +37,20 @@ public class ReactTextChangedEvent extends Event<ReactTextChangedEvent> {
     return EVENT_NAME;
   }
 
+    public void dispatchCustomForMention(RCTEventEmitter rctEventEmitter, int start, int end) {
+        rctEventEmitter.receiveEvent(getViewTag(), getEventName(), serializeEventDataCustomForMention(start, end));
+      }
+
+       private WritableMap serializeEventDataCustomForMention(int start, int end) {
+            WritableMap eventData = Arguments.createMap();
+            eventData.putString("text", mText);
+            eventData.putInt("eventCount", mEventCount);
+            eventData.putInt("target", getViewTag());
+            eventData.putInt("start", start);
+            eventData.putInt("end", end);
+            return eventData;
+            }
+
   @Override
   public void dispatch(RCTEventEmitter rctEventEmitter) {
     rctEventEmitter.receiveEvent(getViewTag(), getEventName(), serializeEventData());
